@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Medicare</title>
+    
+    <style>
+        /* --- Global Styles & Reset --- */
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1, h2, h3 {
+            font-weight: 600;
+            color: #004a99; /* Dark blue */
+        }
+
+        /* --- Header & Navigation --- */
+        header {
+            background-color: #ffffff;
+            border-bottom: 2px solid #e0e0e0;
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        header nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #004a99;
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .nav-links li {
+            margin-left: 1.5rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: #0056b3;
+        }
+
+        /* --- Button Styles --- */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            display: inline-block;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        /* Login Button Specific (in Nav) */
+        .btn-login {
+            background-color: #007bff;
+            color: #ffffff;
+            border: 1px solid #007bff;
+        }
+
+        .btn-login:hover {
+            background-color: #0056b3;
+            color: #ffffff;
+            transform: translateY(-2px);
+        }
+
+        /* Primary Button (in Hero) */
+        .btn-primary {
+            background-color: #28a745; /* Green */
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background-color: #218838;
+        }
+
+
+        /* --- Main Content: Hero Section --- */
+        .hero {
+            background-color: #e6f2ff; /* Light blue */
+            padding: 5rem 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: #444;
+            max-width: 600px;
+            margin: 0 auto 2rem auto;
+        }
+
+        /* --- Main Content: Info Section --- */
+        .info-section {
+            padding: 4rem 0;
+            text-align: center;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+            text-align: left;
+        }
+
+        .info-card {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .info-card h3 {
+            margin-top: 0;
+        }
+
+        /* --- Footer --- */
+        footer {
+            background-color: #343a40;
+            color: #f8f9fa;
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 3rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <nav class="container">
+            <div class="logo">
+                Medicare Portal
+            </div>
+            <ul class="nav-links">
+                <li><a href="#about">About</a></li>
+                <li><a href="#services">Services</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="http://localhost/portal/login.php?role=patient" class="btn btn-login">Login</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Your Health, Your Coverage.</h1>
+                <p>Welcome to your official resource for Medicare information. Access your plan details, find doctors, and manage your benefits.</p>
+                <a href="#services" class="btn btn-primary">See What's Covered</a>
+            </div>
+        </section>
+
+        <section id="services" class="info-section">
+            <div class="container">
+                <h2>Manage Your Benefits</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3>Find Providers</h3>
+                        <p>Search our network for doctors, hospitals, and specialists near you that accept your coverage.</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>View Your Plan</h3>
+                        <p>Access your personal dashboard to review your current plan, check deductibles, and see coverage details.</p>
+                    </div>
+                    <div class="info-card">
+                        <h3>Get Forms</h3>
+                        <p>Download necessary forms for claims, appeals, or updating your personal information easily.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Official Medicare Portal. All rights reserved. (This is a conceptual design)</p>
+        </div>
+    </footer>
+
+</body>
+</html>
