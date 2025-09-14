@@ -201,6 +201,13 @@
             <a id="toggle-link" class="toggle-link" href="login.html">Login</a>
         </div>
     </div>
-
+    <script>
+    // When Doctor radio is clicked, open a new page
+    document.getElementById("doctor").addEventListener("change", function () {
+        if (this.checked) {
+            window.location.href = "DoctorSignup.html"; // change to your desired page
+        }
+    });
+</script>
 </body>
 </html>
