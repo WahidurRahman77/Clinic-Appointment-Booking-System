@@ -176,8 +176,8 @@
             <div class="role-selector">
                 <input type="radio" id="patient" name="role" value="patient" checked>
                 <label for="patient">Patient</label>
-                <input type="radio" id="doctor" name="role" value="doctor">
-                <label for="doctor">Doctor</label>
+                <input type="radio" id="doctor" name="role" value="doctor"  >
+                <label for="doctor" >Doctor</label>
             </div>
 
             <!-- Input Fields -->
@@ -212,6 +212,13 @@
         </div>
     </div>
 
-
+    <script>
+    // When Doctor radio is clicked, open a new page
+    document.getElementById("doctor").addEventListener("change", function () {
+        if (this.checked) {
+            window.location.href = "DoctorLogin.html"; // change to your desired page
+        }
+    });
+    </script>
 </body>
 </html>
