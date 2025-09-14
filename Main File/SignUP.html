@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor & Patient Portal - Sign Up</title>
+    <!-- Google Fonts for a clean look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* General Body Styles */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        /* Main container for the form */
+        .container {
+            background-color: #ffffff;
+            padding: 40px 50px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 420px;
+            box-sizing: border-box;
+            text-align: center;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Form Header */
+        .form-header h1 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .form-header p {
+            margin-bottom: 30px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        /* Role Selection (Doctor/Patient) */
+        .role-selector {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            border: 1px solid #e0e0e0;
+            border-radius: 50px;
+            overflow: hidden;
+        }
+
+        .role-selector input[type="radio"] {
+            display: none; /* Hide the actual radio button */
+        }
+
+        .role-selector label {
+            flex: 1;
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            color: #7f8c8d;
+        }
+
+        .role-selector input[type="radio"]:checked + label {
+            background-color: #3498db;
+            color: #ffffff;
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.4);
+        }
+
+        /* Input Fields */
+        .input-group {
+            position: relative;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #bdc3c7;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 16px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+        
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background-color: #2ecc71;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            background-color: #27ae60;
+            transform: translateY(-2px);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Toggle between Login and Signup */
+        .form-toggle {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .form-toggle .toggle-link {
+            color: #3498db;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .form-toggle .toggle-link:hover {
+            text-decoration: underline;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="container" id="form-container">
+        <!-- Form Header -->
+        <div class="form-header">
+            <h1 id="form-title">Create Account</h1>
+            <p id="form-subtitle">Join our platform by filling out the form below.</p>
+        </div>
+
+        <form id="auth-form">
+            <!-- Role Selector -->
+            <div class="role-selector">
+                <input type="radio" id="patient" name="role" value="patient" checked>
+                <label for="patient">Patient</label>
+                <input type="radio" id="doctor" name="role" value="doctor">
+                <label for="doctor">Doctor</label>
+            </div>
+
+            <!-- Input Fields -->
+            <div class="input-group">
+                <label for="fullname">Full Name</label>
+                <input type="text" id="fullname" placeholder="Enter your full name" required>
+            </div>
+
+            <div class="input-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="e.g., name@example.com" required>
+            </div>
+
+            <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required>
+            </div>
+            
+            <div class="input-group">
+                <label for="confirm-password">Confirm Password</label>
+                <input type="password" id="confirm-password" placeholder="Confirm your password" required>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="submit-btn" id="submit-button">Sign Up</button>
+        </form>
+
+        <!-- Form Toggle Link -->
+        <div class="form-toggle">
+            <span id="toggle-text">Already have an account?</span>
+            <a id="toggle-link" class="toggle-link" href="login.html">Login</a>
+        </div>
+    </div>
+
+</body>
+</html>
