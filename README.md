@@ -110,4 +110,4 @@ This project is open-sourced under the [MIT License](LICENSE).
 
 ---
 
-> _Designed for simplicity. Built for clinics. Powered by open source._
+> _Designed for simplicity. Built for clinics. Powered by Wahidur Rahman._
