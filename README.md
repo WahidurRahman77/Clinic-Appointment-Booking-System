@@ -98,7 +98,11 @@ Contributions are welcome!
 
 ## 📜 License
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 This project is open-sourced under the [MIT License](LICENSE).
+
+> Please review the LICENSE file for additional terms and contact information.
 
 ---
 
