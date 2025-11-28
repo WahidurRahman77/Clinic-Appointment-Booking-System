@@ -1,137 +1,115 @@
 <?php
+// Always start the session
 session_start();
 
-// 1. Check if user is logged in as a patient
-if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== 'patient') {
+// 1. Check if the user is a logged-in doctor
+if (!isset($_SESSION["user_id"]) || $_SESSION["role"] !== 'doctor') {
     header("Location: login.php");
     exit;
 }
 
-$patient_id = $_SESSION["user_id"];
+$doctor_id = $_SESSION["user_id"];
 $fullname = $_SESSION["fullname"];
 $message = '';
 
 // 2. Database Connection
-$conn = new mysqli("localhost", "root", "", "portal_db");
-if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "portal_db";
+$conn = new mysqli($servername, $username, $password, $dbname);
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
 
-// --- HANDLE FORM SUBMISSIONS (BOOKING & CANCELLATION) ---
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    // A. Handle "Request Appointment"
-    if (isset($_POST['request_appointment'])) {
-        $slot_id = $_POST['slot_id'];
+// 3. Handle Appointment Confirmation
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_appointment'])) {
+    $appointment_id = $_POST['appointment_id'];
+    $slot_id = $_POST['slot_id'];
 
-        // FIX #1: Concurrency Check
-        $stmt_check_taken = $conn->prepare("SELECT id FROM appointments WHERE slot_id = ?");
-        $stmt_check_taken->bind_param("i", $slot_id);
-        $stmt_check_taken->execute();
-        $stmt_check_taken->store_result();
+    // Use a transaction
+    $conn->begin_transaction();
+    try {
+        // Update the appointment status to 'confirmed'
+        $stmt_confirm = $conn->prepare("UPDATE appointments SET request_status = 'confirmed' WHERE id = ?");
+        $stmt_confirm->bind_param("i", $appointment_id);
+        $stmt_confirm->execute();
 
-        if ($stmt_check_taken->num_rows > 0) {
-            $message = "<div class='msg-alert msg-error'><i class='fas fa-exclamation-circle'></i> Sorry, this slot was just taken. Please refresh.</div>";
-        } else {
-            $stmt_insert = $conn->prepare("INSERT INTO appointments (patient_id, slot_id) VALUES (?, ?)");
-            $stmt_insert->bind_param("ii", $patient_id, $slot_id);
-            
-            if ($stmt_insert->execute()) { 
-                $message = "<div class='msg-alert msg-success'><i class='fas fa-check-circle'></i> Appointment requested! The doctor will confirm it shortly.</div>"; 
-            } else {
-                $message = "<div class='msg-alert msg-error'><i class='fas fa-times-circle'></i> Error requesting appointment.</div>";
-            }
-            $stmt_insert->close();
-        }
-        $stmt_check_taken->close();
-    }
-    
-    // B. Handle "Cancel Appointment"
-    if (isset($_POST['cancel_appointment'])) {
-        $appointment_id = $_POST['appointment_id']; 
-        $slot_id = $_POST['slot_id']; 
+        // Update the slot status to 'booked'
+        $stmt_book_slot = $conn->prepare("UPDATE appointment_slots SET status = 'booked' WHERE id = ?");
+        $stmt_book_slot->bind_param("i", $slot_id);
+        $stmt_book_slot->execute();
         
-        $conn->begin_transaction();
-        try {
-            $stmt_delete = $conn->prepare("DELETE FROM appointments WHERE id = ? AND patient_id = ?");
-            $stmt_delete->bind_param("ii", $appointment_id, $patient_id);
-            $stmt_delete->execute();
+        $conn->commit();
+        $message = "<div class='msg-alert msg-success'><i class='fas fa-check-circle'></i> Appointment confirmed and slot booked.</div>";
+    } catch (mysqli_sql_exception $exception) {
+        $conn->rollback();
+        $message = "<div class='msg-alert msg-error'><i class='fas fa-times-circle'></i> Error confirming appointment.</div>";
+    }
+}
 
-            if ($slot_id) {
-                $stmt_free_slot = $conn->prepare("UPDATE appointment_slots SET status = 'available' WHERE id = ?");
-                $stmt_free_slot->bind_param("i", $slot_id);
-                $stmt_free_slot->execute();
-            }
-            
-            $conn->commit();
-            $message = "<div class='msg-alert msg-success'><i class='fas fa-trash-alt'></i> Appointment successfully canceled.</div>";
-        } catch (mysqli_sql_exception $exception) { 
-            $conn->rollback(); 
-            $message = "<div class='msg-alert msg-error'>Error canceling appointment.</div>"; 
-        }
+// 3.5. Handle Appointment Cancellation by Doctor
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['cancel_appointment'])) {
+    $appointment_id = $_POST['appointment_id'];
+    $slot_id = $_POST['slot_id'];
+
+    // Use a transaction
+    $conn->begin_transaction();
+    try {
+        // 1. Update the appointment status to 'canceled_by_doctor'
+        $stmt_update = $conn->prepare("UPDATE appointments SET request_status = 'canceled_by_doctor' WHERE id = ? AND request_status = 'confirmed'");
+        $stmt_update->bind_param("i", $appointment_id);
+        $stmt_update->execute();
+
+        // 2. Set the slot back to 'available'
+        $stmt_free_slot = $conn->prepare("UPDATE appointment_slots SET status = 'available' WHERE id = ?");
+        $stmt_free_slot->bind_param("i", $slot_id);
+        $stmt_free_slot->execute();
+        
+        $conn->commit();
+        $message = "<div class='msg-alert msg-success'><i class='fas fa-trash-alt'></i> Appointment canceled. Slot is available again.</div>";
+    } catch (mysqli_sql_exception $exception) {
+        $conn->rollback();
+        $message = "<div class='msg-alert msg-error'>Error canceling appointment.</div>";
     }
 }
 
 
-// --- VIEW LOGIC ---
-
-$selected_category = $_GET['category'] ?? '';
-$selected_doctor_id = $_GET['doctor_id'] ?? '';
-
-// 1. Fetch Categories
-$categories_result = $conn->query("SELECT DISTINCT specialty FROM users WHERE role = 'doctor' AND specialty IS NOT NULL ORDER BY specialty");
-
-// 2. Fetch Doctors
-$doctors_result = null;
-if ($selected_category) {
-    $stmt = $conn->prepare("SELECT id, fullname FROM users WHERE role = 'doctor' AND specialty = ? ORDER BY fullname");
-    $stmt->bind_param("s", $selected_category);
-    $stmt->execute();
-    $doctors_result = $stmt->get_result();
-}
-
-// 3. Fetch Available Slots
-$available_slots = null;
-$doctor_details = null;
-
-if ($selected_doctor_id) {
-    $stmt_doc = $conn->prepare("SELECT fullname, specialty, degrees, designation, workplace FROM users WHERE id = ? AND role = 'doctor'");
-    $stmt_doc->bind_param("i", $selected_doctor_id);
-    $stmt_doc->execute();
-    $doctor_details = $stmt_doc->get_result()->fetch_assoc();
-    $stmt_doc->close();
-
-    $sql_slots = "
-        SELECT s.id AS slot_id, s.appointment_date, s.start_time, d.fullname AS doctor_name 
-        FROM appointment_slots s 
-        JOIN users d ON s.doctor_id = d.id 
-        WHERE s.status = 'available' 
-        AND s.appointment_date >= CURDATE() 
-        AND s.doctor_id = ? 
-        AND s.id NOT IN (SELECT slot_id FROM appointments) 
-        ORDER BY s.appointment_date, s.start_time
-    ";
-
-    $stmt = $conn->prepare($sql_slots);
-    $stmt->bind_param("i", $selected_doctor_id);
-    $stmt->execute();
-    $available_slots = $stmt->get_result();
-}
-
-
-// 4. Fetch History
-$sql_my_appointments = "
+// 4. Fetch Pending Requests
+$sql_pending = "
     SELECT 
-        a.id AS appointment_id, a.slot_id, a.request_status, 
-        s.appointment_date, s.start_time, d.fullname AS doctor_name 
+        a.id AS appointment_id,
+        a.slot_id,
+        p.fullname AS patient_name,
+        s.appointment_date,
+        s.start_time
     FROM appointments a
-    LEFT JOIN appointment_slots s ON a.slot_id = s.id
-    LEFT JOIN users d ON s.doctor_id = d.id
-    WHERE a.patient_id = ?
-    ORDER BY CASE WHEN s.appointment_date IS NULL THEN 1 ELSE 0 END, s.appointment_date, s.start_time
-";
-$stmt_my_app = $conn->prepare($sql_my_appointments);
-$stmt_my_app->bind_param("i", $patient_id);
-$stmt_my_app->execute();
-$my_appointments = $stmt_my_app->get_result();
+    JOIN users p ON a.patient_id = p.id
+    JOIN appointment_slots s ON a.slot_id = s.id
+    WHERE s.doctor_id = ? AND a.request_status = 'pending' AND s.status = 'available'
+    ORDER BY s.appointment_date, s.start_time";
+$stmt_pending = $conn->prepare($sql_pending);
+$stmt_pending->bind_param("i", $doctor_id);
+$stmt_pending->execute();
+$pending_requests = $stmt_pending->get_result();
+
+// 5. Fetch Confirmed Appointments
+$sql_confirmed = "
+    SELECT 
+        a.id AS appointment_id,
+        s.id AS slot_id,
+        p.fullname AS patient_name,
+        s.appointment_date,
+        s.start_time
+    FROM appointments a
+    JOIN users p ON a.patient_id = p.id
+    JOIN appointment_slots s ON a.slot_id = s.id
+    WHERE s.doctor_id = ? AND a.request_status = 'confirmed'
+    ORDER BY s.appointment_date, s.start_time";
+$stmt_confirmed = $conn->prepare($sql_confirmed);
+$stmt_confirmed->bind_param("i", $doctor_id);
+$stmt_confirmed->execute();
+$confirmed_appointments = $stmt_confirmed->get_result();
 
 $conn->close();
 ?>
@@ -140,242 +118,179 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Patient Dashboard | Medicare Portal</title>
+    <title>Manage Appointments | Medicare Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* --- Shared Variables & Global --- */
         :root {
-            --primary-color: #007bff; --primary-dark: #0056b3; --success-color: #28a745;
-            --warning-color: #f39c12; --danger-color: #dc3545; --light-bg: #f4f7f6;
-            --white: #ffffff; --text-dark: #2c3e50; --text-muted: #6c757d;
-            --shadow: 0 10px 30px rgba(0,0,0,0.08); --radius: 12px;
+            --primary: #007bff; --light-bg: #f4f7f6; --white: #fff; --text: #2c3e50; 
+            --success: #28a745; --danger: #dc3545; --shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-        body { font-family: 'Poppins', sans-serif; background-color: var(--light-bg); margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
         
-        /* --- Navbar (Matches Doctor) --- */
-        .navbar { background: var(--white); padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000; }
-        .navbar-brand { font-size: 1.5rem; font-weight: 800; color: var(--primary-color); }
-        .navbar-brand span { color: var(--success-color); }
-        .logout-btn { background: #fff; color: var(--danger-color); border: 2px solid #fadbd8; padding: 8px 25px; border-radius: 50px; text-decoration: none; font-weight: 600; transition: 0.3s; display: flex; align-items: center; gap: 8px; }
-        .logout-btn:hover { background: var(--danger-color); color: white; border-color: var(--danger-color); }
-
-        .main-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; flex: 1; width: 100%; box-sizing: border-box; }
-        .page-header { margin-bottom: 30px; }
-        .page-header h1 { font-size: 2rem; color: var(--text-dark); margin: 0; font-weight: 700; }
-
-        /* --- Cards --- */
-        .card { background: var(--white); border-radius: var(--radius); padding: 30px; box-shadow: var(--shadow); margin-bottom: 30px; }
-        .card-header { border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 25px; }
-        .card-header h2 { margin: 0; font-size: 1.4rem; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
-
-        /* --- Booking Wizard --- */
-        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-        .filter-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: var(--text-dark); }
-        .filter-group select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; font-family: 'Poppins', sans-serif; cursor: pointer; transition: 0.3s; }
-        .filter-group select:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
-
-        /* --- Doctor Profile Preview --- */
-        .doc-profile { display: flex; align-items: center; gap: 20px; background: #f8f9fa; padding: 20px; border-radius: var(--radius); border-left: 5px solid var(--primary-color); margin-bottom: 25px; }
-        .doc-icon { font-size: 2.5rem; color: var(--primary-color); background: #e6f2ff; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-        .doc-info h3 { margin: 0; font-size: 1.3rem; }
-        .doc-info p { margin: 5px 0 0; color: var(--text-muted); font-size: 0.9rem; }
-        .doc-info strong { color: var(--text-dark); }
-        .condition-alert { background: #fff3cd; color: #856404; padding: 12px 15px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 20px; border: 1px solid #ffeeba; display: flex; align-items: center; gap: 10px; }
-
-        /* --- Tables --- */
-        .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th { background: #f8f9fa; color: var(--text-muted); font-weight: 600; text-align: left; padding: 15px; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; color: var(--text-dark); }
-        tr:last-child td { border-bottom: none; }
-
-        /* --- Badges & Buttons --- */
-        .badge { padding: 6px 12px; border-radius: 30px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize; display: inline-block; }
-        .bg-pending { background: #fff3cd; color: #856404; }
-        .bg-confirmed { background: #d1e7dd; color: #0f5132; }
-        .bg-canceled { background: #f8d7da; color: #842029; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Poppins', sans-serif; background: var(--light-bg); margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
         
-        .btn { border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: 0.2s; }
-        .btn-primary { background: var(--primary-color); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-danger { background: var(--white); color: var(--danger-color); border: 1px solid var(--danger-color); }
-        .btn-danger:hover { background: var(--danger-color); color: white; }
-        .btn-disabled { background: #e9ecef; color: #adb5bd; cursor: not-allowed; }
+        /* Navbar */
+        .navbar { background: var(--white); padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .brand { font-size: 1.5rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .back-link { color: var(--text); text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 8px; transition: 0.3s; }
+        .back-link:hover { color: var(--primary); }
 
-        /* --- Alerts & Footer --- */
-        .msg-alert { padding: 15px; margin-bottom: 20px; border-radius: 8px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.5s ease; }
-        .msg-success { background: #d1e7dd; color: #0f5132; border-left: 5px solid var(--success-color); }
-        .msg-error { background: #f8d7da; color: #842029; border-left: 5px solid var(--danger-color); }
+        /* Container */
+        .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; flex: 1; width: 100%; }
+
+        .header { margin-bottom: 30px; border-bottom: 2px solid #e0e0e0; padding-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; color: var(--text); font-size: 1.8rem; }
+        
+        /* Messages */
+        .msg-alert { padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; animation: slideIn 0.5s ease; }
+        .msg-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .msg-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        footer { background: var(--white); color: var(--text-muted); text-align: center; padding: 25px 0; margin-top: auto; border-top: 1px solid #e0e0e0; font-size: 0.9rem; }
-        .placeholder-text { text-align: center; padding: 30px; color: var(--text-muted); font-style: italic; }
+        /* Section Cards */
+        .section-card { background: var(--white); border-radius: 12px; box-shadow: var(--shadow); padding: 0; overflow: hidden; margin-bottom: 40px; }
+        .section-header { background: #f8f9fa; padding: 20px 25px; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
+        .section-header h2 { margin: 0; font-size: 1.2rem; color: var(--text); }
+        .count-badge { background: var(--primary); color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.85rem; }
+
+        /* Tables */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th { background: var(--white); color: #666; font-weight: 600; text-align: left; padding: 18px 25px; font-size: 0.9rem; text-transform: uppercase; border-bottom: 2px solid #f0f0f0; }
+        td { padding: 18px 25px; border-bottom: 1px solid #f0f0f0; color: #333; vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background-color: #fafafa; }
+
+        /* Action Buttons */
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.9rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-confirm { background: #e6f9ed; color: var(--success); }
+        .btn-confirm:hover { background: var(--success); color: white; }
+        .btn-cancel { background: #fff5f5; color: var(--danger); }
+        .btn-cancel:hover { background: var(--danger); color: white; }
+
+        /* Empty State */
+        .no-data { text-align: center; padding: 50px 20px; color: #888; }
+        .no-data i { font-size: 3rem; margin-bottom: 15px; color: #ddd; display: block; }
+
+        footer { text-align: center; padding: 25px; color: #888; border-top: 1px solid #e0e0e0; margin-top: auto; font-size: 0.9rem; background: var(--white); }
 
         @media (max-width: 768px) {
-            .doc-profile { flex-direction: column; text-align: center; border-left: none; border-top: 5px solid var(--primary-color); }
-            .filter-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; gap: 10px; }
         }
     </style>
 </head>
 <body>
 
     <nav class="navbar">
-        <div class="navbar-brand"><i class="fas fa-heartbeat"></i> Medicare<span>Portal</span></div>
-        <a href="logout.php" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        <div class="brand"><i class="fas fa-heartbeat"></i> Medicare</div>
+        <a href="doctor_dashboard.php" class="back-link"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
     </nav>
 
-    <div class="main-container">
-        <div class="page-header">
-            <h1>Welcome, <?php echo htmlspecialchars($fullname); ?></h1>
-            <p style="color: var(--text-muted); margin-top: 5px;">Manage your health and appointments.</p>
+    <div class="container">
+        
+        <div class="header">
+            <h1>Manage Appointments</h1>
         </div>
 
         <?php echo $message; ?>
 
-        <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-calendar-plus" style="color: var(--primary-color);"></i> Book New Appointment</h2>
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-hourglass-half" style="color: #f39c12;"></i>
+                <h2>Pending Requests</h2>
+                <?php if ($pending_requests->num_rows > 0): ?>
+                    <span class="count-badge" style="background: #f39c12;"><?php echo $pending_requests->num_rows; ?></span>
+                <?php endif; ?>
             </div>
             
-            <form action="patient_dashboard.php" method="GET" id="filterForm">
-                <div class="filter-grid">
-                    <div class="filter-group">
-                        <label>1. Select Specialty</label>
-                        <select name="category" onchange="this.form.submit()">
-                            <option value="">-- Choose Category --</option>
-                            <?php while($cat = $categories_result->fetch_assoc()): ?>
-                                <option value="<?php echo htmlspecialchars($cat['specialty']); ?>" <?php if($selected_category == $cat['specialty']) echo 'selected'; ?>>
-                                    <?php echo htmlspecialchars($cat['specialty']); ?>
-                                </option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
-
-                    <?php if ($selected_category && $doctors_result): ?>
-                    <div class="filter-group">
-                        <label>2. Select Doctor</label>
-                         <select name="doctor_id" onchange="this.form.submit()">
-                            <option value="">-- Choose Doctor --</option>
-                            <?php while($doc = $doctors_result->fetch_assoc()): ?>
-                                <option value="<?php echo $doc['id']; ?>" <?php if($selected_doctor_id == $doc['id']) echo 'selected'; ?>>
-                                    Dr. <?php echo htmlspecialchars($doc['fullname']); ?>
-                                </option>
-                            <?php endwhile; ?>
-                        </select>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </form>
-
-            <div style="margin-top: 30px;">
-            <?php if ($selected_doctor_id && $doctor_details): ?>
-                <div class="doc-profile">
-                    <div class="doc-icon"><i class="fas fa-user-md"></i></div>
-                    <div class="doc-info">
-                        <h3>Dr. <?php echo htmlspecialchars($doctor_details['fullname']); ?></h3>
-                        <p><?php echo htmlspecialchars($doctor_details['designation']); ?> | <strong><?php echo htmlspecialchars($doctor_details['specialty']); ?></strong></p>
-                        <p><i class="fas fa-hospital-alt"></i> <?php echo htmlspecialchars($doctor_details['workplace']); ?></p>
-                        <p style="font-size: 0.85rem; color: #888;"><?php echo htmlspecialchars($doctor_details['degrees']); ?></p>
-                    </div>
-                </div>
-                
-                <div class="condition-alert">
-                    <i class="fas fa-info-circle"></i> 
-                    <b>Note:</b> Please arrive 10 minutes before your scheduled slot. Late arrivals may be canceled.
-                </div>
-                
-                <div class="table-responsive">
-                    <?php if ($available_slots && $available_slots->num_rows > 0): ?>
+            <div class="table-responsive">
+                <?php if ($pending_requests->num_rows > 0): ?>
                     <table>
-                        <thead> <tr> <th>Date</th> <th>Time</th> <th style="text-align: right;">Action</th> </tr> </thead>
-                        <tbody>
-                            <?php while($row = $available_slots->fetch_assoc()): ?>
+                        <thead>
                             <tr>
-                                <td><i class="far fa-calendar-alt" style="color:#888; margin-right:5px;"></i> <?php echo date("D, M j, Y", strtotime($row['appointment_date'])); ?></td>
-                                <td><i class="far fa-clock" style="color:#888; margin-right:5px;"></i> <?php echo date("g:i A", strtotime($row['start_time'])); ?></td>
-                                <td style="text-align: right;">
-                                    <form action="patient_dashboard.php?category=<?php echo urlencode($selected_category); ?>&doctor_id=<?php echo $selected_doctor_id; ?>" method="POST">
+                                <th>Patient Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while($row = $pending_requests->fetch_assoc()): ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($row['patient_name']); ?></strong></td>
+                                <td><?php echo date("D, M j, Y", strtotime($row['appointment_date'])); ?></td>
+                                <td><?php echo date("g:i A", strtotime($row['start_time'])); ?></td>
+                                <td>
+                                    <form action="view_requests.php" method="POST">
+                                        <input type="hidden" name="appointment_id" value="<?php echo $row['appointment_id']; ?>">
                                         <input type="hidden" name="slot_id" value="<?php echo $row['slot_id']; ?>">
-                                        <button type="submit" name="request_appointment" class="btn btn-primary">Book Now</button>
+                                        <button type="submit" name="confirm_appointment" class="btn btn-confirm">
+                                            <i class="fas fa-check"></i> Confirm
+                                        </button>
                                     </form>
                                 </td>
                             </tr>
                             <?php endwhile; ?>
                         </tbody>
                     </table>
-                    <?php else: ?>
-                        <p class="placeholder-text">No slots available for this doctor currently.</p>
-                    <?php endif; ?>
-                </div>
-
-            <?php elseif ($selected_category): ?>
-                <p class="placeholder-text"><i class="fas fa-arrow-up"></i> Select a doctor to view their profile and schedule.</p>
-            <?php else: ?>
-                <p class="placeholder-text"><i class="fas fa-arrow-up"></i> Start by selecting a medical specialty above.</p>
-            <?php endif; ?>
+                <?php else: ?>
+                    <div class="no-data">
+                        <i class="far fa-folder-open"></i>
+                        <p>You have no pending appointment requests.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h2><i class="fas fa-history" style="color: var(--success-color);"></i> My Appointments</h2>
+
+        <div class="section-card">
+            <div class="section-header">
+                <i class="fas fa-calendar-check" style="color: var(--success);"></i>
+                <h2>Confirmed Appointments</h2>
             </div>
+            
             <div class="table-responsive">
-                <?php if ($my_appointments->num_rows > 0): ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Doctor</th>
-                            <th>Date & Time</th>
-                            <th>Status</th>
-                            <th style="text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php while($row = $my_appointments->fetch_assoc()): 
-                            $status = $row['request_status'];
-                            $status_class = ($status == 'confirmed') ? 'bg-confirmed' : (($status == 'pending') ? 'bg-pending' : 'bg-canceled');
-                            $status_text = ($status == 'canceled_by_doctor') ? 'Canceled by Dr.' : $status;
-                        ?>
-                        <tr>
-                            <td><strong>Dr. <?php echo htmlspecialchars($row['doctor_name']); ?></strong></td>
-                            <td>
-                                <?php if($row['appointment_date']): ?>
-                                    <?php echo date("M j, Y", strtotime($row['appointment_date'])); ?> <br>
-                                    <small style="color:#888"><?php echo date("g:i A", strtotime($row['start_time'])); ?></small>
-                                <?php else: ?>
-                                    <span style="color: #999;">N/A</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><span class="badge <?php echo $status_class; ?>"><?php echo htmlspecialchars($status_text); ?></span></td>
-                            <td style="text-align: right;">
-                                <form action="patient_dashboard.php" method="POST" onsubmit="return confirm('Cancel this appointment?');">
-                                    <input type="hidden" name="appointment_id" value="<?php echo $row['appointment_id']; ?>">
-                                    <input type="hidden" name="slot_id" value="<?php echo $row['slot_id']; ?>">
-                                    <button type="submit" name="cancel_appointment" class="btn <?php echo ($status == 'canceled_by_doctor') ? 'btn-disabled' : 'btn-danger'; ?>" 
-                                        <?php if ($status == 'canceled_by_doctor') echo 'disabled'; ?>>
-                                        <i class="fas fa-times"></i> Cancel
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        <?php endwhile; ?>
-                    </tbody>
-                </table>
+                <?php if ($confirmed_appointments->num_rows > 0): ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Patient Name</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while($row = $confirmed_appointments->fetch_assoc()): ?>
+                            <tr>
+                                <td><strong><?php echo htmlspecialchars($row['patient_name']); ?></strong></td>
+                                <td><?php echo date("D, M j, Y", strtotime($row['appointment_date'])); ?></td>
+                                <td><?php echo date("g:i A", strtotime($row['start_time'])); ?></td>
+                                <td>
+                                    <form action="view_requests.php" method="POST" onsubmit="return confirm('Are you sure you want to cancel this appointment? The slot will become available again.');">
+                                        <input type="hidden" name="appointment_id" value="<?php echo $row['appointment_id']; ?>">
+                                        <input type="hidden" name="slot_id" value="<?php echo $row['slot_id']; ?>">
+                                        <button type="submit" name="cancel_appointment" class="btn btn-cancel">
+                                            <i class="fas fa-times"></i> Cancel
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
                 <?php else: ?>
-                    <p class="placeholder-text">You have no appointment history.</p>
+                    <div class="no-data">
+                        <i class="far fa-calendar"></i>
+                        <p>You have no upcoming confirmed appointments.</p>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
 
     </div>
 
-    <footer>
-        <div class="container">
-            &copy; <?php echo date("Y"); ?> <strong>Medicare Portal</strong>. All Rights Reserved.
-        </div>
-    </footer>
+    <footer>&copy; <?php echo date("Y"); ?> Medicare Portal. All Rights Reserved.</footer>
 
 </body>
 </html>
