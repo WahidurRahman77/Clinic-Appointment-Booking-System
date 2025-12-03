@@ -1,33 +1,38 @@
-# 🏥 Clinic Appointment Booking System
+# 🏥 Medicare Portal - Appointment Booking System
 
-Welcome to the **Clinic Appointment Booking System**!  
-A powerful, easy-to-use web application for clinics that streamlines doctor schedules, patient registration, and appointment management.
+Welcome to the **Medicare Portal**!
+A secure and robust full-stack web application that connects patients with doctors. It streamlines the entire process of scheduling, confirming, and managing medical appointments using automated logic and secure authentication.
 
 ---
 
 ## 🚀 Overview
 
-This system enables clinics of all sizes to digitize their operations—patients can register, book appointments, and doctors can manage their schedules efficiently. Built with PHP and MySQL, designed to run seamlessly on **XAMPP**.
+This system digitizes clinic operations by offering distinct dashboards for **Doctors** and **Patients**. It features an automated time-slot generator for doctors and a conflict-free booking system for patients. Built with **Core PHP** and **MySQL**, it is optimized to run seamlessly on a local **XAMPP** environment.
 
 ---
 
-## 🎯 Features
+## 🎯 Key Features
 
-- **User Registration:** Secure sign-up and login for patients and admins.
-- **Doctor Management:** Add, edit, and remove doctors; assign specializations.
-- **Booking Appointments:** Patients easily book, view, or cancel appointments.
-- **Admin Dashboard:** Comprehensive management of appointments, doctors, and patients.
-- **Notification System:** Receive alerts for appointment confirmations and cancellations.
-- **Responsive Design:** User-friendly interface across all devices.
-- **Secure Authentication:** Password encryption and session protection.
+- **👥 Role-Based Access:** Distinct secure login/signup flows for **Patients** and **Doctors**.
+- **📅 Dynamic Schedule Management:** Doctors can input start/end times, and the system automatically generates 15-minute appointment slots.
+- **✅ Appointment Workflow:**
+    - Patients can filter doctors by specialty and request appointments.
+    - Doctors can **Confirm** or **Cancel** requests via their dashboard.
+    - Real-time status updates (Pending, Confirmed, Canceled).
+- **🔒 Security & Recovery:**
+    - Secure password hashing (`password_hash`).
+    - **Forgot Password System:** Integrated **Brevo (Sendinblue) API** to send real 6-digit OTPs via email for password resets.
+- **🚫 Concurrency Handling:** Prevents double-booking by locking slots immediately upon request.
+- **📱 Responsive UI:** Custom CSS design with FontAwesome icons and AOS (Animate On Scroll) animations.
 
 ---
 
 ## 🛠️ Technologies
 
-- **Frontend:** HTML5, CSS3, JavaScript, Bootstrap 5  
-- **Backend:** PHP 7+
-- **Database:** MySQL (**XAMPP Only**)
+- **Frontend:** HTML5, CSS3 (Custom), JavaScript, FontAwesome, AOS Library.
+- **Backend:** Native PHP (7.4+)
+- **Database:** MySQL (Relational DB with Transactions)
+- **API Integration:** Brevo (formerly Sendinblue) for SMTP Email logic.
 - **Web Server:** Apache (via XAMPP)
 
 ---
@@ -36,38 +41,38 @@ This system enables clinics of all sizes to digitize their operations—patients
 
 1. **Download & Install [XAMPP](https://www.apachefriends.org/index.html)**
 2. **Start Apache & MySQL** from the XAMPP Control Panel.
-3. **Import the Database:**
+3. **Database Setup:**
    - Open `phpMyAdmin` (`http://localhost/phpmyadmin`)
-   - Create a database, e.g., `clinic_appointment`
-   - Import `clinic_appointment.sql` from the repository.
-4. **Configure Database Connection:**
-   - Update your PHP DB config:
-     ```php
-     $conn = mysqli_connect("localhost", "root", "", "clinic_appointment");
-     ```
+   - Create a new database named **`portal_db`** (Important: Must match `login.php` config).
+   - Import the provided SQL file (if available) or create tables for `users`, `appointment_slots`, `appointments`, and `password_resets`.
+4. **Configure API (Optional):**
+   - To make the "Forgot Password" feature work, open `forgot_password.php`.
+   - Replace the `$api_key` variable with your own **Brevo/Sendinblue API Key**.
 5. **Place Files:**
-   - Copy all files into your XAMPP `htdocs` directory:
+   - Copy all project files into a folder in your `htdocs` directory:
      ```
-     C:\xampp\htdocs\Clinic-Appointment-Booking-System
+     C:\xampp\htdocs\Medicare-Portal
      ```
 6. **Run the Application:**
-   - Visit: `http://localhost/Clinic-Appointment-Booking-System/`
+   - Visit: `http://localhost/Medicare-Portal/Home Page.html`
 
 ---
 
 ## 📁 Project Structure
 
 ```plaintext
-Clinic-Appointment-Booking-System/
-├── assets/                # CSS, JS, images
-├── config/                # DB connection files
-├── admin/                 # Admin panel
-├── doctor/                # Doctor pages
-├── patient/               # Patient dashboard
-├── appointment/           # Booking management
-├── clinic_appointment.sql # Database dump
-├── index.php              # Entry point
-└── README.md
+Medicare-Portal/
+├── Home Page.html        # Landing page with animations
+├── login.php             # Universal login (Doctor/Patient)
+├── signup.php            # Registration logic
+├── doctor_dashboard.php  # Doctor: Create slots & view status
+├── patient_dashboard.php # Patient: Book slots & view history
+├── manage_slots.php      # Doctor: Delete slots logic
+├── view_requests.php     # Doctor: Approve/Reject appointments
+├── forgot_password.php   # API logic for sending OTP
+├── verify_otp.php        # Validate email OTP
+├── reset_password.php    # Set new password
+└── logout.php            # Session destruction
 ```
 
 ---
@@ -77,6 +82,7 @@ Clinic-Appointment-Booking-System/
 > **Important:**  
 > This system is designed and fully tested for **MySQL on XAMPP**.  
 > ⚡ Not guaranteed to work on other database servers (e.g., PostgreSQL, MSSQL).
+> [Brevo](https://www.brevo.com/) for Email API services(forgot and reset password OTP).
 
 ---
 
@@ -110,6 +116,7 @@ This project is open-sourced under the [MIT License](LICENSE).
 
 - [Bootstrap](https://getbootstrap.com/)
 - [XAMPP](https://www.apachefriends.org/index.html)
+- [Brevo](https://www.brevo.com/) for Email API services.
 - The PHP community
 
 ---
