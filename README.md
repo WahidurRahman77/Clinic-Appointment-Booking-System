@@ -3,6 +3,8 @@
 Welcome to the **Medicare Portal**!
 A secure and robust full-stack web application that connects patients with doctors. It streamlines the entire process of scheduling, confirming, and managing medical appointments using automated logic and secure authentication.
 
+![image alt](https://github.com/WahidurRahman77/Clinic-Appointment-Booking-System/blob/531da81b41ca14cef69ebd68437d5bc13b83ac95/Pictures/readmepic.png)
+
 ---
 
 ## 🚀 Overview
